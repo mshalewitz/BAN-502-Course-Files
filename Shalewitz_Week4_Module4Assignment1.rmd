@@ -1,0 +1,255 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+library(RColorBrewer)
+```
+
+```{r}
+heart <- read_csv("heart_disease-1.csv")
+```
+
+```{r}
+heart = heart %>%  
+  mutate_if(is.character, as_factor) %>%
+  mutate(HeartDisease = as_factor(HeartDisease)) %>%
+  mutate(HeartDisease = fct_recode(HeartDisease, "No" = "0", "Yes" = "1" ))
+```
+
+### Task 1
+
+```{r}
+set.seed(12345)
+heart_split = initial_split(heart, prop = .70, strata = HeartDisease)
+train = training(heart_split)
+test = testing(heart_split)
+```
+
+### Task 2
+
+```{r}
+heart_recipe = recipe(HeartDisease ~., train) 
+
+tree_model = decision_tree() %>%
+  set_engine("rpart", model = TRUE) %>%
+  set_mode("classification")
+
+heart_wflow =
+  workflow() %>%
+  add_model(tree_model) %>%
+  add_recipe(heart_recipe)
+
+heart_fit = fit(heart_wflow, train)
+```
+
+```{r}
+tree = heart_fit %>%
+  pull_workflow_fit() %>%
+  pluck("fit")
+
+fancyRpartPlot(tree)
+```
+
+### Task 3
+
+```{r}
+heart_fit$fit$fit$fit$cptable
+```
+
+The optimal cp tried by R would be .017.
+
+### Task 4
+
+```{r}
+set.seed(123)
+folds = vfold_cv(train, v = 5)
+
+heart_recipe = recipe(HeartDisease ~., train) %>%
+  step_dummy(all_nominal(),-all_outcomes())
+
+tree_model = decision_tree(cost_complexity = tune()) %>% 
+  set_engine("rpart", model = TRUE) %>% 
+  set_mode("classification")
+
+tree_grid = grid_regular(cost_complexity(),
+                          levels = 25) 
+
+heart_wflow = 
+  workflow() %>% 
+  add_model(tree_model) %>% 
+  add_recipe(heart_recipe)
+
+tree_res = 
+  heart_wflow %>% 
+  tune_grid(
+    resamples = folds,
+    grid = tree_grid
+    )
+
+tree_res
+
+
+```
+
+```{r}
+tree_res %>%
+  collect_metrics() %>%
+  ggplot(aes(cost_complexity, mean)) +
+  geom_line(size = 1.5, alpha = 0.6) +
+  geom_point(size = 2) +
+  facet_wrap(~ .metric, scales = "free", nrow = 2) 
+```
+
+### Task 5
+```{r}
+best_tree = tree_res %>%
+  select_best("accuracy")
+
+best_tree
+```
+The optimal accuracy value is .007.
+
+### Task 6 
+
+```{r}
+final_wf = 
+  heart_wflow %>%
+  finalize_workflow(best_tree)
+```
+
+```{r}
+final_fit = fit(final_wf, train)
+
+tree = final_fit %>%
+  pull_workflow_fit() %>%
+  pluck("fit")
+
+fancyRpartPlot(tree)
+```
+
+### Task 7
+
+```{r}
+treepred = predict(final_fit, train, type = "class")
+head(treepred)
+```
+
+```{r}
+confusionMatrix(treepred$.pred_class,train$HeartDisease,positive="Yes")
+```
+
+The accuracy of the tree in task 6 is 87%. 
+
+### Task 8
+
+```{r}
+blood <- read_csv("~/Predictive Analysis/Module 4/Shalewitz_Week4_Module4Assignment1/Blood.csv")
+```
+```{r}
+blood = blood %>% 
+  mutate(DonatedMarch = as_factor(DonatedMarch)) %>%
+  mutate(DonatedMarch = fct_recode(DonatedMarch, "No" = "0", "Yes" = "1"))
+  
+```
+
+### Task 9
+
+```{r}
+set.seed(1234)
+blood_split = initial_split(blood, prop = .70, strata = DonatedMarch)
+train2 = training(blood_split)
+test2 = testing(blood_split)
+```
+
+```{r}
+set.seed(1234)
+folds2 = vfold_cv(train2, v = 5)
+
+blood_recipe = recipe(DonatedMarch ~., train2) %>%
+  step_dummy(all_nominal(),-all_outcomes())
+
+tree_model2 = decision_tree(cost_complexity = tune()) %>% 
+  set_engine("rpart", model = TRUE) %>% 
+  set_mode("classification")
+
+tree_grid2 = grid_regular(cost_complexity(),
+                          levels = 25) 
+
+blood_wflow = 
+  workflow() %>% 
+  add_model(tree_model2) %>% 
+  add_recipe(blood_recipe)
+
+tree_res2 = 
+  blood_wflow %>% 
+  tune_grid(
+    resamples = folds2,
+    grid = tree_grid2
+    )
+
+tree_res2
+```
+
+```{r}
+tree_res2 %>%
+  collect_metrics() %>%
+  ggplot(aes(cost_complexity, mean)) +
+  geom_line(size = 1.5, alpha = 0.6) +
+  geom_point(size = 2) +
+  facet_wrap(~ .metric, scales = "free", nrow = 2) 
+```
+
+The cp that appears to be optimal seems to be close to .0165.
+
+```{r}
+best_tree2 = tree_res2 %>%
+  select_best("accuracy")
+
+best_tree2
+```
+
+### Task 10
+
+```{r}
+final_wf2 = 
+  blood_wflow %>%
+  finalize_workflow(best_tree2)
+```
+
+```{r}
+final_fit2 = fit(final_wf2, train2)
+
+tree2 = final_fit2 %>%
+  pull_workflow_fit() %>%
+  pluck("fit")
+
+fancyRpartPlot(tree2)
+```
+
+### Task 11
+
+```{r}
+treepred2 = predict(final_fit2, train2, type = "class")
+head(treepred2)
+
+treepred_test = predict(final_fit2, test2, type = "class")
+head(treepred_test)
+```
+
+```{r}
+confusionMatrix(treepred2$.pred_class,train2$DonatedMarch,positive="Yes")
+```
+
+```{r}
+confusionMatrix(treepred_test$.pred_class,test2$DonatedMarch,positive="Yes")
+```
+
+From the test set and the training set there is a difference in accuracy of about 2% but overall both have a high accuracy percentage of 78% and 80%. They are both also better than the naive testing set. 

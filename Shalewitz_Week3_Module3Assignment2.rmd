@@ -1,0 +1,269 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(e1071)
+library(ROCR)
+parole = read.csv("parole.csv")
+```
+
+```{r}
+parole = parole %>% mutate(male = as_factor(male)) %>%
+  mutate(male = fct_recode(male, "female" = "0", "male" = "1"))
+parole = parole %>% mutate(race = as_factor(race)) %>%
+  mutate(race = fct_recode(race, "white" = "1", "other" = "2"))
+parole = parole %>% mutate(crime = as_factor(crime)) %>%
+  mutate(crime = fct_recode(crime, "larceny" = "2", "drug-related" = "3", "driving-related" = "4", "other" = "1"))
+parole = parole %>% mutate(multiple.offenses = as_factor(multiple.offenses)) %>%
+  mutate(multiple.offenses = fct_recode(multiple.offenses, "other" = "0", "multiple" = "1"))
+parole = parole %>% mutate(violator = as_factor(violator)) %>%
+  mutate(violator = fct_recode(violator, "completed" = "0", "violated" = "1"))
+
+```
+
+#### Task 1
+
+```{r}
+set.seed(12345)
+parole_split = initial_split(parole, pro = .70, strata = violator)
+Train = training(parole_split)
+Test = testing(parole_split)
+```
+#### Task 2
+
+```{r}
+ggplot(Train, aes(x = male, fill = violator)) + geom_bar() 
+```
+
+```{r}
+t1 = table(Train$male, Train$violator)
+prop.table(t1, margin= 2)
+```
+
+
+```{r}
+ggplot(Train, aes(x = male, fill = violator)) + geom_bar(position = "fill") + theme_bw()
+```
+
+As we see from this bar graph compared to the first one while it seemed based off the first one male or female would be an indicator, this graph shows that it is not much of an indicator.
+
+```{r}
+ggplot(Train, aes(x = race, fill = violator)) + geom_bar(position = "fill") + theme_bw()
+```
+
+Race seems to be a decent indicator, I used a bar graph for this one because there was only two factors involved and this shows pretty accurately the difference between the two factors.
+
+
+```{r}
+ggplot(Train, aes(x=violator, y = age)) + geom_boxplot() + theme_bw()
+```
+
+Age doesn't seem to predict wether or not they would violate parole or not, I did a boxplot because there are a multitude of ages that are represented so to get an average of those would help visualize it. 
+
+```{r}
+ggplot(Train, aes(x = state, fill = violator)) + geom_bar(position="fill") + theme_bw()
+```
+
+```{r}
+t2 = table(Train$state,Train$violator)
+prop.table(t2, margin = 2)
+```
+
+
+State seems to be a very good predictor of which state's parolees had a higher chance of violating parole. I used this chart since there was four options and did the fill option to see the percentages rather than the count, since the count was distributed very unbalanced. 
+
+```{r}
+ggplot(Train, aes(x=violator, y = time.served)) + geom_boxplot() + theme_bw()
+```
+
+Time served could be a decent predictor, showing that the longer the time served the more likely they are to not violate parole. I used a boxplot to see the average time someone served that completed and the average time they served to see if they violated to see if this could be a predictor. 
+
+```{r}
+ggplot(Train, aes(x=violator, y = max.sentence)) + geom_boxplot() + theme_bw()
+```
+
+Max sentence is a good predictor. The longer the max sentence the more likely they were to complete the parole compared to those that violated. Once again used a boxplot to see the averages clearly. 
+
+```{r}
+ggplot(Train, aes(x = multiple.offenses, fill = violator)) + geom_bar(position="fill") + theme_bw()
+```
+
+Multiple offenses is a decent predictor, showing surpsingly that people with multiple offenses actually violated parole more than those who have'nt had multiple offenses
+
+```{r}
+ggplot(Train, aes(x = crime, fill = violator)) + geom_bar(position="fill") + theme_bw()
+```
+
+The type of crime is sort of a good predictor, but only with the driving related factor, showing someone with a driving-related crime is more likely to complete parole. 
+
+### Task 3
+
+```{r}
+parole_model =
+  logistic_reg() %>%
+  set_engine("glm")
+
+parole_recipe = recipe(violator ~ state, Train) 
+
+logreg_wf = workflow() %>%
+  add_recipe(parole_recipe) %>%
+  add_model(parole_model)
+
+parole_fit = fit(logreg_wf, Train)
+```
+
+```{r}
+summary(parole_fit$fit$fit$fit)
+```
+
+The model looks good with an AIC of 327.16 and state being a very significant with a p-value well below .05.
+
+### Task 4
+
+```{r}
+parole_model =
+  logistic_reg() %>%
+  set_engine("glm")
+
+parole_recipe = recipe(violator ~ state + race + multiple.offenses, Train) 
+  
+
+logreg_wf = workflow() %>%
+  add_recipe(parole_recipe) %>%
+  add_model(parole_model)
+
+parole_fit2 = fit(logreg_wf, Train)
+```
+
+```{r}
+options(scipen = 999)
+summary(parole_fit2$fit$fit$fit)
+options(scipen = 0)
+```
+This model compared to the model just comparing state is better, the AIC went from 327.16 to 291.58 and everything included is significant. I believe this model will be very intuitive it has the key predictors I noticed while looking at the visuals. State being the most significant. Multiple offenses being the second most sginificant, if someone has multiple offenses they are more likely to violate their parole.  
+
+### Task 5
+
+```{r}
+parole_model =
+  logistic_reg() %>%
+  set_engine("glm")
+
+parole_recipe = recipe(violator ~ state + race + multiple.offenses, Train) 
+  
+
+logreg_wf = workflow() %>%
+  add_recipe(parole_recipe) %>%
+  add_model(parole_model)
+
+parole_fit2 = fit(logreg_wf, Train)
+
+predictions = predict(parole_fit2, Train, type="prob")[2]
+head(predictions)
+
+options(scipen = 999)
+summary(parole_fit2$fit$fit$fit)
+options(scipen = 0)
+
+```
+
+I believe this model will be very intuitive it has the key predictors I noticed while looking at the visuals. State being the most significant. Multiple offenses being the second most significant, if someone has multiple offenses they are more likely to violate their parole. Race showing that people of other races are more likely to violate their parole. 
+
+### Task 6
+
+```{r}
+predictions1 = predict(parole_fit2, Train, type="prob") [3,1,1]
+head(predictions)
+
+predictions2 = predict(parole_fit2, Train, type="prob") [2,2,0]
+head(predictions)
+```
+
+Parolee1's probability of violating parole is .62 whereas Parolee2's probability is only .37.
+
+### Task 7
+
+```{r}
+ROCRpred = prediction(predictions, Train$violator)
+
+ROCRperf = performance(ROCRpred, "tpr", "fpr")
+plot(ROCRperf, colorize=TRUE, print.cutoffs.at=seq(0,1,by=0.1), text.adj=c(-0.2,1.7))
+```
+
+```{r}
+opt.cut = function(perf, pred){
+  cut.ind = mapply(FUN=function(x, y, p){
+    d = (x - 0)^2 + (y-1)^2
+    ind = which(d == min(d))
+    c(sensitivity = y[[ind]], specificity = 1-x[[ind]],
+      cutoff = p[[ind]])
+  }, perf@x.values, perf@y.values, pred@cutoffs)
+}
+print(opt.cut(ROCRperf, ROCRpred))
+```
+
+.17 is the best probability threshold.
+
+### Task 8
+
+```{r}
+t3 = table(Train$violator,predictions > .1701749)
+t3
+```
+
+Accuracy
+```{r}
+(364+31)/(364+53+23+31)
+```
+The accuracy of the model is .83.
+
+Sensitivity
+```{r}
+31/(23+31)
+```
+The sensitivity is .57.
+
+Specificity
+```{r}
+364/(364+53)
+```
+The specificity is .87.
+
+With this model we aren't very likely to detect positives, but do have a very good chance at avoiding false alarms. With parolees I think the implications would be lesser for avoiding false alarms. The accuracy of the model is a good accuray though being almost 84%.
+
+```{r}
+t4 = table(Train$violator,predictions > .3)
+t4
+
+(394+12)/(394+23+42+12)
+```
+
+### Task 9
+
+```{r}
+t5 = table(Train$violator,predictions > .6)
+t5
+
+(417+1)/(417+0+53+1)
+```
+
+.6 is the probability threshold that maximizes accuracy.
+
+### Task 10
+
+```{r}
+predictions_test = predict(parole_fit2, Test, type="prob")[2]
+
+t6 = table(Test$violator, predictions_test > .6)
+t6
+```
+
+Accuracy
+```{r}
+(178+0)/(178+2+24+0)
+```
+The accuracy of the Test set is only .01 off of the predictions accuracy of Train set.

@@ -1,0 +1,67 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+
+## Module 1 Assignment 2
+
+#### Task 1
+```{r}
+library(tidyverse)
+library(esquisse)
+```
+
+#### Task 2  
+```{r}
+diamonddata = diamonds
+nrow(diamonddata)
+ncol(diamonddata)
+```
+
+The number of rows in diamond data set is `r nrow(diamonddata)`.
+The number of coumns in the diamond data set is `r ncol(diamonddata)`.
+
+#### Task 3
+```{r}
+ggplot(diamonddata, aes(x = carat, y = price)) + geom_point()
+```
+
+#### Task 4
+```{r}
+ggplot(diamonddata, aes(x = carat, y = price, color = cut)) + geom_point()
+```
+
+#### Task 5
+```{r}
+ggplot(diamonddata, aes(x = carat, y = price, color = cut)) + geom_point() + facet_grid(color ~ .) 
+```
+
+From the visual above color and carat directly affect the cost and each other. Diamonds with the color D(best) have a higher price at a lower carat count. Whereas diamonds with the color J(Worst) need to have more carats to reach the price of the D diamonds. The cut doesn't seem to have much affect on the price since there's all types of cuts at the same price. The diamonds with the color D do seem to have better cuts, and vice versa more diamonds with the color J have worse cuts. 
+
+#### Task 6
+```{r}
+InventoryData <- read_csv("InventoryData.csv")
+```
+
+#### Task 7
+```{r}
+inventoryA <- filter(InventoryData, Supplier == "A")
+nrow(inventoryA)
+```
+inventoryA's data frame contains `r nrow(inventoryA)` rows.   
+
+#### Task 8 
+```{r}
+inventoryA = mutate(inventoryA, OnHandRatio = `On Hand`/ `Annual Demand`)
+```
+
+The line of code above creates a new column in the inventoryA data table that divides the Annual Demand data by the On Hand data to give the On Hand ratio.
+
+#### Task 9
+```{r}
+avg_costs <- InventoryData %>% group_by(`Item SKU`) %>% summarise(mean(`Cost per Unit ($)`))
+```
+
+#### Task 10
+The part I found the most challenging was the facets, but reading up on it helped me understand pretty easily. 
